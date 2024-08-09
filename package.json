@@ -1,0 +1,10 @@
+{
+  "name": "NewProject",
+  "uuid": "409de7c8-40a6-4171-82f4-1f79d1ad2217",
+  "creator": {
+    "version": "3.8.3"
+  },
+  "dependencies": {
+    "@ton/cocos-sdk": "^0.0.1-beta.1"
+  }
+}
