@@ -9,6 +9,7 @@ export enum CHIP {
 import { _decorator, Component, EventTouch, Input, Node, Prefab, find, UITransform, EventKeyboard, KeyCode, input, CCInteger, PhysicsSystem2D, Label, Collider2D, IPhysics2DContact, Contact2DType, tween, Color, Graphics, Sprite, v3 } from 'cc';
 const { ccclass, property } = _decorator;
 
+@ccclass
 export default class ChipManager extends Component {
     @property([ChipItem])
     chipItems: ChipItem[] = [];
@@ -30,14 +31,19 @@ export default class ChipManager extends Component {
     private readonly _dimColor = new Color(92, 92, 92);
     private readonly _normalColor = new Color(255, 255, 255);
 
-    activeChip(node: Node = null) {
+    activeChip(node: Node = null, anim = true) {
         this.chipItems.forEach((chip, i) => {
             chip.node.getComponent(Sprite).color = chip.node === node ? this._normalColor : this._dimColor;
             if (node) {
                 this.currChipNode = node;
+                // if (!anim) {
+                //     node.scale = v3(1, 1, 1);
+                //     return
+                // }\
+                const time = anim ? 0.025 : 0;
                 tween(node)
-                    .to(0.15, { scale: v3(0.95, 0.95, 0.95) })
-                    .to(0.15, { scale: v3(1, 1, 1) })
+                    .to(time, { scale: v3(0.95, 0.95, 0.95) })
+                    .to(time, { scale: v3(1, 1, 1) })
                     .start();
             }
         })

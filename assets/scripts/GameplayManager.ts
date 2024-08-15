@@ -4,6 +4,7 @@ import BetManager from "./BetManager";
 import ChipItem from "./ChipItem";
 import ChipManager from "./ChipManager";
 import { EventType } from "./EventManager";
+import GameAPI from "./GameAPI";
 import { GameConst } from "./GameDefines";
 import HintBet from "./HintBet";
 // import PopupManager from "./PopupManager";
@@ -14,7 +15,7 @@ import UserInfo from "./UserInfo";
 import { Utils } from "./Utils";
 
 // import { GameFi, TonConnectUI, Address, toNano } from '@ton/cocos-sdk';
-import { _decorator, Component, EventTouch, Input, Node, Prefab, find, UITransform, EventKeyboard, KeyCode, input, CCInteger, PhysicsSystem2D, Label, Collider2D, IPhysics2DContact, Contact2DType, Vec2, Vec3, sys, AudioSource, AudioClip, Sprite, instantiate } from 'cc';
+import { _decorator, Component, EventTouch, Node, Prefab, UITransform, EventKeyboard, KeyCode, Label, Vec2, Vec3, sys, Animation, AudioClip, Sprite, instantiate, v3, Button } from 'cc';
 const { ccclass, property } = _decorator;
 
 export enum BET_OPTION {
@@ -307,6 +308,9 @@ export default class GameplayManager extends BaseScreen {
     @property(Node)
     placeBet: Node = null;
 
+    @property(Node)
+    winningBall: Node = null;
+
     @property(SpinManager)
     spinCtrl: SpinManager = null;
 
@@ -353,6 +357,10 @@ export default class GameplayManager extends BaseScreen {
     hintBetPref: Prefab = null;
     hintBet: Node;
 
+    // @property(Animation)
+    spinBtnAnim: Animation = null;
+    btnSpinning: boolean = false;
+
     onShow() {
         super.onShow();
         this.onUpdateTime();
@@ -368,7 +376,10 @@ export default class GameplayManager extends BaseScreen {
             GameplayManager._instance = this;
         }
 
+        this.spinBtnAnim = this.spinBtn.children[0].getComponent(Animation);
+        console.log('@@ this ',this.spinBtnAnim)
         this.betOptions = this.betNode.children;
+        this.spinCtrl.gameCtrl = this;
         this.spinCtrl.node.active = false;
         this.board = this.node.getChildByName('board');
         this.initBetOptions();
@@ -376,11 +387,20 @@ export default class GameplayManager extends BaseScreen {
         this.node.getChildByName('controlTouch').on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
         this.node.getChildByName('controlTouch').on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
         this.node.getChildByName('controlTouch').on(Node.EventType.MOUSE_MOVE, this.onMouseMove, this);
+        
         this.startNewGame();
         this.userBalance = UserInfo.getInstance().gameFund;
+        console.log('user balance ', this.userBalance)
         this.updateUserBalanceUI();
         // TO DO EVENT
         // systemEvent.on(EventType.UPDATE_USD, this.onUpdateTime.bind(this));
+        this.spinBtnAnim = this.spinBtn.children[0].getComponent(Animation);
+        console.log('@@ this ',this.spinBtnAnim)
+    }
+
+    updateUserBalanceOnLoad(coins) {
+        this.userBalance = coins;
+        this.updateUserBalanceUI();
     }
 
 
@@ -391,18 +411,18 @@ export default class GameplayManager extends BaseScreen {
         this.updateUserBalanceUI();
     }
 
-    protected lateUpdate(dt: number): void {
-        if (  this.mustUpdateTime) {
-            const countdownTime =  Math.ceil(UserInfo.getInstance().timeToGetFreeCoinCd - Date.now())/1000;
+    // protected lateUpdate(dt: number): void {
+    //     if (  this.mustUpdateTime) {
+    //         const countdownTime =  Math.ceil(UserInfo.getInstance().timeToGetFreeCoinCd - Date.now())/1000;
 
-            if ( countdownTime > 0) {
-                this.setCountdownTime(countdownTime);
-            } else {
-                this.mustUpdateTime = false;
-                this.setCountdownTime();
-            }
-        }
-    }
+    //         if ( countdownTime > 0) {
+    //             this.setCountdownTime(countdownTime);
+    //         } else {
+    //             this.mustUpdateTime = false;
+    //             this.setCountdownTime();
+    //         }
+    //     }
+    // }
 
     @property(Node)
     countdownNode: Node = null;
@@ -440,16 +460,17 @@ export default class GameplayManager extends BaseScreen {
 
     onTouchStart(event: EventTouch) {
         // const localPos = eventl
-        const localPos = event.getLocation();
+        const localPos = event.getUILocation();
         const chips = this.chipCtrl.chipItems;
+
         // Touch on Chip
         for (let i = 0; i < chips.length; i++) {
             if (!chips[i].node.active) {
                 continue;
-            }
+            }   
             const bounce = chips[i].node.getComponent(UITransform).getBoundingBoxToWorld();
             if (bounce.contains(localPos)) {
-                SoundManager.inst.playPickChip();
+                // SoundManager.inst.playPickChip();
                 this.onClickOnChip(chips[i].node, localPos);
                 return;
             }
@@ -463,12 +484,12 @@ export default class GameplayManager extends BaseScreen {
             }
             const bounce = node.getComponent(UITransform).getBoundingBoxToWorld();
             if (bounce.contains(localPos)) {
-                // console.log('@@ node',node)
+                // console.log('@@ bet ',node)
                 if (this.chipCtrl.currChipNode.active) {
-                    // console.log('@@ node 2',node)
-                    this.onClickOnChip(this.chipCtrl.currChipNode, localPos);
+
+                    this.onClickOnChip(this.chipCtrl.currChipNode, localPos, false);
                     this.onClickOnBet(node, localPos);
-                    SoundManager.inst.playPutChip();
+                    // SoundManager.inst.playPutChip();
                     return;
                 } else {
                     // console.log('@@ gameFund 3',UserInfo.getInstance().gameFund)
@@ -482,12 +503,14 @@ export default class GameplayManager extends BaseScreen {
         }
     }
     curMoveChip: Node = null;
-    onClickOnChip(chipNode: Node, localPos: Vec2) {
-        this.chipCtrl.activeChip(chipNode);
+    onClickOnChip(chipNode: Node, localPos: Vec2, anim = true) {
+        this.chipCtrl.activeChip(chipNode, anim);
         this.curMoveChip = instantiate(this.chipCtrl.currChipNode);
         // TO DO
-        // this.curMoveChip.scale = this.chipCtrl.currChipNode.scale * 0.35;
-        // this.curMoveChip.parent = this.node;
+        this.curMoveChip.scale = this.chipCtrl.currChipNode.scale.multiplyScalar(0.35)
+        this.curMoveChip.parent = this.node;
+        // this.curMoveChip.setWorldPosition(localPos.x, localPos.y, 1)
+        Utils.setWorldPos(this.curMoveChip, v3(localPos.x, localPos.y, 1));
         // Utils.setWorldPos(this.curMoveChip, localPos);
     }
 
@@ -496,44 +519,44 @@ export default class GameplayManager extends BaseScreen {
         this.isBetting = true;
     }
 
-    onTouchMove(event: Touch) {
+    onTouchMove(event: EventTouch) {
 
         // TO DO
-        // const localPos = event.getLocation();
-        // if (this.curMoveChip) {
-        //     Utils.setWorldPos(this.curMoveChip, localPos);
-        // }
-        // // Touch on Table
-        // for (let i = this.betOptions.length - 1; i >= 0; i--) {
-        //     const node = this.betOptions[i];
-        //     if (!node.active) {
-        //         continue;
-        //     }
-        //     const bounce = node.getBoundingBoxToWorld();
-        //     if (bounce.contains(localPos) && this.chipCtrl.currChipNode.active) {
-        //         // console.log('@@@ onTouchMove ', node)
-        //         this.onClickOnBet(node, localPos);
-        //         return;
-        //     }
-        // }
+        const localPos = event.getUILocation();
+        if (this.curMoveChip) {
+            Utils.setWorldPos(this.curMoveChip, v3(localPos.x, localPos.y, 1));
+        }
+        // Touch on Table
+        for (let i = this.betOptions.length - 1; i >= 0; i--) {
+            const node = this.betOptions[i];
+            if (!node.active) {
+                continue;
+            }
+            const bounce = node.getComponent(UITransform).getBoundingBoxToWorld();
+            if (bounce.contains(localPos) && this.chipCtrl.currChipNode.active) {
+                // console.log('@@@ onTouchMove ', node)
+                this.onClickOnBet(node, localPos);
+                return;
+            }
+        }
         this.unHighlightAllBet();
     }
 
-    onTouchEnd(event: Touch) {
+    onTouchEnd(event: EventTouch) {
                 // TO DO
-        // const localPos = event.getLocation();
-        // for (let i = this.betOptions.length - 1; i >= 0; i--) {
-        //     const node = this.betOptions[i];
-        //     if (!node.active) {
-        //         continue;
-        //     }
-        //     const bounce = node.getBoundingBoxToWorld();
-        //     // if (bounce.contains(localPos)) {
-        //     if (bounce.contains(localPos) && this.chipCtrl.currChipNode.active) {
-        //         this.onMakeBet(node);
-        //         return;
-        //     }
-        // }
+        const localPos = event.getUILocation();
+        for (let i = this.betOptions.length - 1; i >= 0; i--) {
+            const node = this.betOptions[i];
+            if (!node.active) {
+                continue;
+            }
+            const bounce = node.getComponent(UITransform).getBoundingBoxToWorld();
+            // if (bounce.contains(localPos)) {
+            if (bounce.contains(localPos) && this.chipCtrl.currChipNode.active) {
+                this.onMakeBet(node);
+                return;
+            }
+        }
         if (this.curMoveChip) {
             this.curMoveChip.removeFromParent();
             this.curMoveChip = null;
@@ -1008,12 +1031,14 @@ export default class GameplayManager extends BaseScreen {
         const wPos = Utils.getWorldPos(node);
         Utils.setWorldPos(betChip, wPos);
         this.betChipsRound.push(betChip);
+        // console.log(betChip.components)
+        // console.log(betChip.getComponent(ChipItem));
         this.unHighlightAllBet();
         this.betCtrl.addBet(node.name);
         this.updateBetStatusUndoClear();
         const bet = {
             betType: node.name,
-            amount: betChip.getComponent(ChipItem).betAmount
+            amount: betChip.components[3].betAmount
         }
         this.betArrays.push(bet);
         if (this.hintBet) {
@@ -1961,35 +1986,67 @@ export default class GameplayManager extends BaseScreen {
 
         const successCallback = () => {
             this.placeBet.active = false;
+            this.winningBall.active = false;
             this.numLastBet = this.betChipsRound.length;
             this.updateUserBalance();
             this.isSpinning = false;
         }
 
-        let isWin = false
-        let totalWin = 0;
-        let totalBetInWin = 0;
-        this.spinCtrl.node.active = true;
-        const rand = Utils.randomRange(0,37,true);
-        for (let i =0; i < this.betArrays.length; i++) {
-            const bet = this.betArrays[i];
-            const betResponse = this.getOddsFromBet(bet.betType, rand);
-            if (betResponse.isWin) {
-                isWin = true;
-                totalWin += bet.amount * betResponse.mul;
-                totalBetInWin += bet.amount;
-            }
-        }
-        let response = {
-            spinResult: rand,
-            winAmount: totalWin,
-            totalBetInWin: totalBetInWin,
-            youWin: isWin
+        // let n = 0;
 
+        const callbackFnc = (response) => {
+            console.log('Response SPIN ', response)
+            this.activeSpinBtn(false);
+            // if (response && response.code === 200) {
+                this.spinCtrl.node.active = true;
+                // n = response.data.spinResult;
+                        let result = {
+            spinResult: response.winningNum,
+            winAmount: response.totalWon,
+            totalBetInWin: 0,
+            youWin: response.isWin
+                        }
+                this.spinCtrl.startSpin(result);
+                successCallback();
+                this.updateUserBalanceUI(true);
+                // successCallback();
+            // } else {
+            //     console.log('@@@ failed')
+            //     // PopupManager.getInstance().showError('Bet Invalid');
+            //     this.isSpinning = false;
+            //     this.startNewGame();
+            // }
         }
-        this.spinCtrl.startSpin(response);
-        successCallback();
-        this.updateUserBalanceUI(true);
+
+        // let isWin = false
+        // let totalWin = 0;
+        // let totalBetInWin = 0;
+        // this.spinCtrl.node.active = true;
+        // const rand = Utils.randomRange(0,37,true);
+        // for (let i =0; i < this.betArrays.length; i++) {
+        //     const bet = this.betArrays[i];
+        //     const betResponse = this.getOddsFromBet(bet.betType, rand);
+        //     if (betResponse.isWin) {
+        //         isWin = true;
+        //         totalWin += bet.amount * betResponse.mul;
+        //         totalBetInWin += bet.amount;
+        //     }
+        // }
+        // let response = {
+        //     spinResult: rand,
+        //     winAmount: totalWin,
+        //     totalBetInWin: totalBetInWin,
+        //     youWin: isWin
+
+        // }
+
+        GameAPI.getInstance().bet(param, callbackFnc)
+        // this.activeSpinBtn(false);
+        
+        // console.log('@@ response ', response)
+        // this.spinCtrl.startSpin(response);
+        // successCallback();
+        // this.updateUserBalanceUI(true);
     }
 
     startNewGame() {
@@ -1997,6 +2054,7 @@ export default class GameplayManager extends BaseScreen {
         this.isBetting = false;
         this.spinCtrl.node.active = false;
         this.placeBet.active = true;
+        this.winningBall.active = true;
         this.onClearBtnClick();
         this.updateBetStatusUndoClear();
         this.lastBetArray = this.betArrays || [];
@@ -2050,8 +2108,7 @@ export default class GameplayManager extends BaseScreen {
 
 
     onRebetBtnClick() {
-
-
+        this.makeRebet();
     }
 
     getColor(num: string) {
@@ -2104,14 +2161,34 @@ export default class GameplayManager extends BaseScreen {
                 this.undoNode.active = true;
             }
         }
-        this.spinBtn.active = this.undoNode.active || this.clearNode.active;
+        const isActive = this.undoNode.active || this.clearNode.active;
+        this.activeSpinBtn(isActive);
         this.updateUserBalanceUI();
+    }
+
+    activeSpinBtn(isActive) {
+        if (isActive) {
+            if (!this.btnSpinning) {
+                this.spinBtnAnim.play();
+            }
+            this.btnSpinning = true;
+        } else {
+            this.spinBtnAnim.stop();
+            this.btnSpinning = false;
+        }
+        this.spinBtn.getComponent(Button).interactable = isActive;
+        this.spinBtn.children.forEach(child => {
+            child.getComponent(Sprite).grayscale = !isActive;
+        })
     }
 
     updateUserBalanceUI(resetAmount = false) {
         let amount = 0;
+        // console.log('@@ this ',this.betChipsRound)
         this.betChipsRound.forEach((chip) => {
-            amount += chip.getComponent(ChipItem).betAmount;
+            amount += chip.components[3].betAmount;
+            // amount += chip.getComponent(ChipItem).betAmount;
+            // amount += chip.getComponent(ChipItem).betAmount;
         })
         if (resetAmount) {
             amount = 0;
@@ -2125,8 +2202,10 @@ export default class GameplayManager extends BaseScreen {
         this.tempBalance = this.userBalance - this.betAmount;
         const chips = this.chipCtrl.chipItems
         for (let i = 0; i < chips.length; i++) {
-            chips[i].node.active = chips[i].getComponent(ChipItem).betAmount <= this.tempBalance;
+            chips[i].node.active = true;
+            chips[i].node.active = chips[i].betAmount <= this.tempBalance;
         }
+        this.chipCtrl.node.active = true;
     }
 
     updateUserBalance(addAmount = 0) {

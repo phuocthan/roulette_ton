@@ -89,7 +89,7 @@ export class TonWalletComp extends Component {
             const address = this._connectUI.account.address;
             this.connectLabel.string = Address.parseRaw(address).toString( {testOnly: true, bounceable: false }).substring(0, 6) + '...';
         } else {
-            this.connectLabel.string = "Connect";
+            this.connectLabel.string = "Connect Your Ton Wallet";
         }
     }
 

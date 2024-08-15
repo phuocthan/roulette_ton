@@ -54,7 +54,7 @@ export default class UserInfo extends Component {
   }
   public set btcPrice(value) {
     this._btcPrice = value;
-    EventManager.getInstance().emit(EventType.UPDATE_FUND, {gameFund: value});
+    // EventManager.getInstance().emit(EventType.UPDATE_FUND, {gameFund: value});
   }
 
   private _gameFund = -99;
@@ -67,7 +67,7 @@ export default class UserInfo extends Component {
   }
   public set gameFund(value) {
     this._gameFund = value;
-    EventManager.getInstance().emit(EventType.UPDATE_FUND, {gameFund: value});
+    // EventManager.getInstance().emit(EventType.UPDATE_FUND, {gameFund: value});
     sys.localStorage.setItem('CHIP_AMOUNT', this._gameFund);
   }
 
@@ -93,7 +93,7 @@ export default class UserInfo extends Component {
     return this._chipAmount;
   }
   public set chipAmount(value) {
-    EventManager.getInstance().emit(EventType.UPDATE_FUND, {gameFund: value});
+    // EventManager.getInstance().emit(EventType.UPDATE_FUND, {gameFund: value});
     this._chipAmount = value;
   }
 

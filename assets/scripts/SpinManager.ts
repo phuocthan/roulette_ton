@@ -4,7 +4,7 @@ import SoundManager from "./Sound/SoundManager";
 import UserInfo from "./UserInfo";
 import { Utils } from "./Utils";
 
-import { _decorator, Component, Node, find, UITransform, EventKeyboard, KeyCode, Animation, CCInteger, PhysicsSystem2D, Label, Collider2D, IPhysics2DContact, Contact2DType, Vec2, Vec3, sys, AudioSource, AudioClip } from 'cc';
+import { _decorator, Component, Node, find, UITransform, EventKeyboard, KeyCode, Animation, CCInteger, PhysicsSystem2D, Label, Collider2D, IPhysics2DContact, Contact2DType, Vec2, Vec3, sys, AudioSource, AudioClip, Sprite, SpriteFrame } from 'cc';
 const { ccclass, property } = _decorator;
 @ccclass
 export default class SpinManager extends Component {
@@ -41,6 +41,20 @@ export default class SpinManager extends Component {
 
     @property(Node)
     touchToSkip: Node = null;
+    @property(Node)
+    youWin: Node = null;
+    @property(Node)
+    dealerWin: Node = null;
+
+    @property(Label)
+    winAmount: Label = null;
+    @property(Label)
+    winBall: Label = null;
+    @property(Sprite)
+    winBallSpr: Sprite = null;
+
+    @property(SpriteFrame)
+    winBallSprFrames: SpriteFrame[] = [];
 
     // @property(Node)
     // wheelHighlight: Node = null;
@@ -54,6 +68,7 @@ export default class SpinManager extends Component {
     isSpinning: boolean = false;
     selectedNum: string;
     spinInfo: any;
+
     // ballParentNode: Node;
     // originalPosBall: Vec2;
 
@@ -61,9 +76,7 @@ export default class SpinManager extends Component {
     onLoad() {
         const tesst = this.ball.getComponent(Animation);
         this.winPanel.active = false;
-        this.gameCtrl = find('Canvas/MainNode/Gameplay').getComponent('GameplayManager');
-        // this.ballParentNode = this.ball.parent;
-        // this.originalPosBall = this.ball.getPosition();
+        // this.gameCtrl = find('Canvas/MainNode/Gameplay').getComponent('GameplayManager');
     }
 
     startSpin(spinInfo) {
@@ -84,15 +97,17 @@ export default class SpinManager extends Component {
         this.rouletteSpin.parent.active = true;
         this.highlightNode.active = false;
         this.isSpinning = true;
-        // this.ballAnim = this.ball.getComponent(Animation);
+        this.ballAnim = this.ball.getComponent(Animation);
+        this.youWin.active = this.dealerWin.active = false;
+        this.winAmount.node.parent.active = false;
         // console.log('@@@ ball ', this.ball)
         // console.log('@@@ ballAnim ', this.ballAnim)
         this.ballAnim.play();
         this.winPanel.active = false;
-        this.resultNode.active = false;
+        // this.resultNode.active = false;
         this.selectedNum = num;
         this.spinInfo = spinInfo;
-        SoundManager.inst.playWheelStart();
+        // SoundManager.inst.playWheelStart();
         setTimeout ( () => {
             this.touchToSkip.active = true;;
             // this.stopBtnNode.active = false;;
@@ -124,7 +139,7 @@ export default class SpinManager extends Component {
             this.ballHighlight.active = true;
             this.ball.active = false;
         }
-        SoundManager.inst.playWheelStop();
+        // SoundManager.inst.playWheelStop();
     }
 
     start() {
@@ -138,15 +153,15 @@ export default class SpinManager extends Component {
         this.highlightNode.active = true;
         const idx = this.ROULETTE_NUM.indexOf(num);
         this.highlightNode.angle = idx * -this.RAD_PER_NUM;
-        this.resultNode.active = true;
-        this.resultLbl.string = this.gameCtrl.getColor(num) + ' ' + num + '!';
+        // this.resultNode.active = true;
+        // this.resultLbl.string = this.gameCtrl.getColor(num) + ' ' + num + '!';
         const isYouWin = this.spinInfo.youWin;
         const winAmount = this.spinInfo.winAmount
 
         setTimeout(() => {
-            this.resultNode.active = false;
-            this.showWinner(isYouWin, winAmount);
-            isYouWin ? SoundManager.inst.playWin() : SoundManager.inst.playLose();
+            // this.resultNode.active = false;
+            this.showWinner(isYouWin, num);
+            // isYouWin ? SoundManager.inst.playWin() : SoundManager.inst.playLose();
             this.gameCtrl.userBalance = this.gameCtrl.userBalance + this.spinInfo.winAmount + this.spinInfo.totalBetInWin;
             UserInfo.getInstance().gameFund = this.gameCtrl.userBalance;
             if ( this.gameCtrl.userBalance === 0) {
@@ -159,18 +174,36 @@ export default class SpinManager extends Component {
         }, 1250)
     }
 
-    showWinner(isYouWin, numWin: number) {
-        const winner = !isYouWin ? 'Dealer Win!' : 'You Win!'
+    showWinner(isYouWin, num: string) {
+        // const winner = !isYouWin ? 'Dealer Win!' : 'You Win!'
+        const colorWon = GameplayManager.getInstance().getColor(num);
+        if(colorWon === 'Black') {
+            this.winBallSpr.spriteFrame = this.winBallSprFrames[1];
+        } else if (colorWon === 'Red') {
+            this.winBallSpr.spriteFrame = this.winBallSprFrames[0];
+        } else {
+            this.winBallSpr.spriteFrame = this.winBallSprFrames[2];
+        }
+
+        this.winBall.string = num;
+        console.log('colorWon ',colorWon)
         this.rouletteSpin.parent.active = false;
         this.highlightNode.active = false;
         this.winPanel.active = true;
         this.ballHighlight.active = false;
         this.ball.active = true;
-        this.winPanel.children[0].getComponent(Label).string = winner;
-        this.winPanel.children[1].children[2].getComponent(Label).string = '' + numWin + UserInfo.currency;
-        this.winPanel.children[1].children[2].active = isYouWin;
-        this.winPanel.children[1].children[0].active = false;
-        this.winPanel.children[1].children[1].active = isYouWin;
+        this.youWin.active = isYouWin;
+        this.dealerWin.active = !isYouWin;
+        this.winAmount.node.parent.active = isYouWin;
+        this.winAmount.string = '' + this.spinInfo.winAmount;
+        // if (isYouWin) {
+
+        // }
+        // this.winPanel.children[0].getComponent(Label).string = winner;
+        // this.winPanel.children[1].children[2].getComponent(Label).string = '' + numWin + UserInfo.currency;
+        // this.winPanel.children[1].children[2].active = isYouWin;
+        // this.winPanel.children[1].children[0].active = false;
+        // this.winPanel.children[1].children[1].active = isYouWin;
         setTimeout(() => {
             this.gameCtrl.startNewGame();
         }, 1250)
